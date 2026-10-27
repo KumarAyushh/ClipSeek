@@ -12,7 +12,8 @@
     "typecheck": "turbo run typecheck && tsc --noEmit",
     "test": "bun test",
     "db:migrate": "bun --env-file=.env scripts/migrate.ts",
-    "kafka:setup": "bun --env-file=.env scripts/create-topics.ts"
+    "kafka:setup": "bun --env-file=.env scripts/create-topics.ts",
+    "spike": "bun --env-file=.env apps/workers/scripts/spike.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",

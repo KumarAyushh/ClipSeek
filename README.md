@@ -21,7 +21,7 @@ Bun · TypeScript · Turborepo · Express · Apache Kafka (KRaft) · PostgreSQL 
 
 ## Run locally
 
-Requirements: [Bun](https://bun.sh) ≥ 1.3, Docker, ffmpeg.
+Requirements: [Bun](https://bun.sh) ≥ 1.3, Docker, ffmpeg. The first run downloads the four models (~1.6 GB) into `storage/models/`; `bun run spike` checks they all load.
 
 ```bash
 cp .env.example .env        # then fill in the values
