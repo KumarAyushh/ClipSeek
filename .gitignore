@@ -1,0 +1,23 @@
+# Only README.md is published; all other notes (CLAUDE.md, progress.md, learning.md, fileorder.md) stay local
+*.md
+!README.md
+
+# Dependencies and build output
+node_modules/
+dist/
+.turbo/
+
+# Local env
+.env
+.env.*
+!.env.example
+
+# Uploaded videos, thumbnails, downloaded models
+storage/
+
+# Editor / OS / tooling
+.claude/
+.vscode/
+.idea/
+.DS_Store
+*.log
