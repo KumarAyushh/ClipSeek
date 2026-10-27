@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The browser has the DOM (document, window), not Bun's APIs
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    // Compile JSX (<div>) using React 17+'s automatic runtime (no `import React` needed)
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "vite.config.ts"]
+}

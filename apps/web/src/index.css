@@ -1,0 +1,2 @@
+/* Tailwind v4: this one import gives access to every utility class (p-4, text-xl, ...) */
+@import "tailwindcss";
