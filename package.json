@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "turbo run typecheck && tsc --noEmit",
     "test": "bun test",
     "db:migrate": "bun --env-file=.env scripts/migrate.ts",
     "kafka:setup": "bun --env-file=.env scripts/create-topics.ts"
@@ -18,5 +18,8 @@
     "@types/bun": "^1.4.4",
     "turbo": "^2.11.10",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@app/shared": "workspace:*"
   }
 }
