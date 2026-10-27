@@ -3,3 +3,4 @@
 export { config } from "./config";
 export { sql } from "./db";
 export { createKafka, VIDEO_UPLOADED_PARTITIONS } from "./kafka";
+export type { Video, VideoStatus } from "./types";
