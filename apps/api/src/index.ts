@@ -5,6 +5,7 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
 import { config, sql } from "@app/shared";
+import { producer } from "./kafka";
 import { videosRouter } from "./videos";
 
 const app = express();
@@ -47,6 +48,11 @@ app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   if (status >= 500) console.error(err);
   res.status(status).json({ error: err instanceof Error ? err.message : String(err) });
 });
+
+// Connect to Kafka before accepting requests. If Kafka is down the API crashes here,
+// loudly, instead of accepting uploads it can't hand to the workers.
+// (Top-level await works because this is an ES module.)
+await producer.connect();
 
 app.listen(config.apiPort, () => {
   console.log(`api listening on http://localhost:${config.apiPort}`);

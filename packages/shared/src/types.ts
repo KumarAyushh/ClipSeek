@@ -18,3 +18,12 @@ export type Video = {
   error: string | null;
   created_at: Date; // timestamptz comes back as a JS Date
 };
+
+// The value of one `video.uploaded` Kafka message (sent as JSON).
+// The API builds it after the DB insert; every worker parses it. Keeping the type here
+// means both sides break at compile time if one of them changes the shape.
+// The message key is the videoId too, so one video always lands on the same partition.
+export type VideoUploadedEvent = {
+  videoId: string; // uuid of the videos row
+  filePath: string; // relative to config.storageDir, same as videos.file_path
+};

@@ -5,13 +5,15 @@
 //                               ffmpeg faststart ──▶ storage/videos/<id>.mp4
 //                               ffprobe JSON ──▶ videos.metadata (jsonb) + duration_s
 //                               temp upload deleted, row inserted with status 'processing'
-// Day 4 adds: publish `video.uploaded` to Kafka after the insert.
+//                               publish `video.uploaded` to Kafka → workers take it from there
+// The API answers right after publishing; it never waits for the workers.
 
 import fs from "node:fs";
 import path from "node:path";
 import { Router } from "express";
 import multer from "multer";
 import { config, sql, type Video } from "@app/shared";
+import { publishVideoUploaded } from "./kafka";
 import { faststart, probe, type ProbeResult } from "./media";
 
 // storage/uploads = raw files while they're being prepared (deleted right after)
@@ -85,6 +87,7 @@ videosRouter.post("/", upload.single("video"), async (req, res) => {
   const duration = Number.parseFloat(metadata.format.duration ?? "");
   const durationS = Number.isFinite(duration) ? duration : null;
 
+  let video: Video | undefined;
   try {
     // Pass the object itself: Bun's client turns it into JSON once. Passing
     // JSON.stringify(metadata) would encode it twice and store one big jsonb *string*,
@@ -93,14 +96,28 @@ videosRouter.post("/", upload.single("video"), async (req, res) => {
       INSERT INTO videos (id, title, file_path, duration_s, metadata)
       VALUES (${id}, ${title}, ${filePath}, ${durationS}, ${metadata}::jsonb)
       RETURNING *`;
-    // 201 Created = a new resource exists now
-    res.status(201).json(rows[0]);
+    video = rows[0];
   } catch (err) {
     // No row points at the file, so nothing would ever clean it up. Remove it, then let
     // Express's error handler answer 500.
     await fs.promises.rm(absPath, { force: true });
     throw err;
   }
+
+  // Publish AFTER the insert: when a worker gets the message, the row is already there.
+  try {
+    await publishVideoUploaded({ videoId: id, filePath });
+  } catch (err) {
+    // Kafka didn't take the message, so no worker will ever process this video and it
+    // would sit in 'processing' forever. Undo the upload (row + file) and answer 500;
+    // the client can simply upload again.
+    await sql`DELETE FROM videos WHERE id = ${id}`;
+    await fs.promises.rm(absPath, { force: true });
+    throw err;
+  }
+
+  // 201 Created = a new resource exists now. Status is 'processing' until all three workers finish.
+  res.status(201).json(video);
 });
 
 // GET /videos — newest first. Leaves out `metadata` (can be large) and `file_path`
