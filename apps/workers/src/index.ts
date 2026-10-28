@@ -1,7 +1,7 @@
 // Entry point for the background workers. Each worker is a Kafka consumer in its own group:
 //   visual-worker  -> frames   (CLIP)              Day 5 (visual.ts)
 //   speech-worker  -> segments (Whisper + bge)     Day 6 (speech.ts)
-//   sound-worker   -> sounds   (CLAP)              Day 7
+//   sound-worker   -> sounds   (CLAP)              Day 7 (sound.ts)
 //
 // Usage (from apps/workers):
 //   bun run dev            → all three workers in one process (what `bun run dev` at the root starts)
@@ -9,29 +9,17 @@
 //                            two copies split the topic's 3 partitions between them.
 
 import { sql, type Consumer } from "@app/shared";
-import { startWorker, type Job, type WorkerDef, type WorkerName } from "./runner";
+import { startWorker, type WorkerDef, type WorkerName } from "./runner";
+import { createSoundWorker } from "./sound";
 import { createSpeechWorker } from "./speech";
 import { createVisualWorker } from "./visual";
-
-// Day 4 placeholder for sound: check the video file exists, then pretend to work
-// for 5 seconds, sending a heartbeat every second. A missing file throws → the video is
-// marked 'failed'. Day 7 replaces it.
-async function placeholderWork(job: Job): Promise<void> {
-  if (!(await Bun.file(job.filePath).exists())) {
-    throw new Error(`video file not found: ${job.filePath}`);
-  }
-  for (let i = 0; i < 5; i++) {
-    await Bun.sleep(1000);
-    await job.heartbeat();
-  }
-}
 
 // One "create" function per worker. Creating a worker loads its model(s), which takes
 // seconds and memory, so we only create the workers that were asked for.
 const WORKERS: Record<WorkerName, () => Promise<WorkerDef>> = {
   visual: createVisualWorker,
   speech: createSpeechWorker,
-  sound: async () => ({ name: "sound", process: placeholderWork }),
+  sound: createSoundWorker,
 };
 
 // process.argv = [bun, src/index.ts, <worker name?>]

@@ -1,5 +1,5 @@
 // Getting a video's sound out as numbers an audio model can read.
-// Used by the speech worker (Whisper, 16 kHz) and, on Day 7, the sound worker (CLAP, 48 kHz).
+// Used by the speech worker (Whisper, 16 kHz) and the sound worker (CLAP, 48 kHz).
 
 import { sql } from "@app/shared";
 import { withHeartbeat } from "./heartbeat";

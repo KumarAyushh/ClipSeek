@@ -1,11 +1,17 @@
 // Loads the ML models the workers use. Each loader is called ONCE per process, at startup,
 // and the loaded model is reused for every video (loading takes seconds; running is fast).
-// CLIP (Day 5), Whisper + bge (Day 6); Day 7 adds CLAP. (Day 8 moves the loaders to
+// CLIP (Day 5), Whisper + bge (Day 6), CLAP (Day 7). (Day 8 moves the loaders to
 // packages/shared, because the API needs the text encoders for search.)
 
 import path from "node:path";
 import { config } from "@app/shared";
-import { AutoProcessor, CLIPVisionModelWithProjection, env, pipeline } from "@huggingface/transformers";
+import {
+  AutoProcessor,
+  CLIPVisionModelWithProjection,
+  ClapAudioModelWithProjection,
+  env,
+  pipeline,
+} from "@huggingface/transformers";
 
 // Keep downloaded models in storage/models instead of deep inside node_modules,
 // so `bun install` never wipes them and they stay out of git (storage/ is ignored).
@@ -39,4 +45,19 @@ export function loadWhisper() {
 // The pipeline = tokenizer (text → token ids, cut at 512 tokens) + model (→ one vector per token).
 export function loadTextEmbedder() {
   return pipeline("feature-extraction", config.models.textEmbed, { dtype: DTYPE });
+}
+
+// CLAP's AUDIO side, for 10s sound windows. Search (Day 8) will use CLAP's TEXT side with the
+// same model id, so sounds and queries land in the same 512-d space.
+// - processor: 48 kHz samples → log-mel spectrogram (64 frequency bands × ~1000 time steps
+//   for 10s). It takes ONE clip per call. Shorter than 10s → repeated to fill 10s; LONGER →
+//   a random 10s crop (config `truncation: "rand_trunc"`), which is why we cut windows ourselves.
+// - model: "WithProjection" = returns `audio_embeds` from the projection head (512-d),
+//   the layer that is shared with the text side
+export async function loadClapAudio() {
+  const [processor, model] = await Promise.all([
+    AutoProcessor.from_pretrained(config.models.clap),
+    ClapAudioModelWithProjection.from_pretrained(config.models.clap, { dtype: DTYPE }),
+  ]);
+  return { processor, model };
 }
