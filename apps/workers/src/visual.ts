@@ -10,6 +10,7 @@ import { mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { config, sql } from "@app/shared";
 import { RawImage } from "@huggingface/transformers";
+import { withHeartbeat } from "./heartbeat";
 import { loadClipVision } from "./models";
 import type { Job, WorkerDef } from "./runner";
 import { toPgVector, toVectors } from "./vectors";
@@ -18,8 +19,6 @@ import { toPgVector, toVectors } from "./vectors";
 export const FRAME_INTERVAL_S = 2;
 // How many frames go through CLIP in one call. Bigger = faster per frame but more memory.
 const BATCH_SIZE = 16;
-// How often to tell Kafka we're alive while ffmpeg runs (session timeout is 30s).
-const HEARTBEAT_MS = 3000;
 
 // Frame i (0-based) is at i × 2 seconds. Timestamps are always SECONDS, never the raw index.
 export function frameTimeS(index: number): number {
@@ -116,23 +115,16 @@ async function extractFrames(input: string, outDir: string, heartbeat: () => Pro
   const stderr = new Response(proc.stderr).text();
 
   // Decoding a long video can take minutes, longer than Kafka's session timeout.
-  // So instead of just `await proc.exited`, wake up every 3s to send a heartbeat.
-  let finished = false;
-  const exited = proc.exited.finally(() => {
-    finished = true;
-  });
+  // So instead of just `await proc.exited`, send a heartbeat every 3s while we wait.
   try {
-    while (!finished) {
-      await heartbeat();
-      await Promise.race([exited, Bun.sleep(HEARTBEAT_MS)]); // whichever comes first
-    }
+    await withHeartbeat(proc.exited, heartbeat);
   } finally {
     // If heartbeat() threw (e.g. a Kafka rebalance), don't leave ffmpeg running.
     // After a normal exit this does nothing.
     proc.kill();
   }
 
-  if ((await exited) !== 0) {
+  if ((await proc.exited) !== 0) {
     throw new Error(`ffmpeg frame extraction failed: ${(await stderr).trim()}`);
   }
 }

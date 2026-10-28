@@ -1,6 +1,6 @@
 // Entry point for the background workers. Each worker is a Kafka consumer in its own group:
 //   visual-worker  -> frames   (CLIP)              Day 5 (visual.ts)
-//   speech-worker  -> segments (Whisper + bge)     Day 6
+//   speech-worker  -> segments (Whisper + bge)     Day 6 (speech.ts)
 //   sound-worker   -> sounds   (CLAP)              Day 7
 //
 // Usage (from apps/workers):
@@ -10,11 +10,12 @@
 
 import { sql, type Consumer } from "@app/shared";
 import { startWorker, type Job, type WorkerDef, type WorkerName } from "./runner";
+import { createSpeechWorker } from "./speech";
 import { createVisualWorker } from "./visual";
 
-// Day 4 placeholder for speech + sound: check the video file exists, then pretend to work
+// Day 4 placeholder for sound: check the video file exists, then pretend to work
 // for 5 seconds, sending a heartbeat every second. A missing file throws → the video is
-// marked 'failed'. Days 6–7 replace it.
+// marked 'failed'. Day 7 replaces it.
 async function placeholderWork(job: Job): Promise<void> {
   if (!(await Bun.file(job.filePath).exists())) {
     throw new Error(`video file not found: ${job.filePath}`);
@@ -29,7 +30,7 @@ async function placeholderWork(job: Job): Promise<void> {
 // seconds and memory, so we only create the workers that were asked for.
 const WORKERS: Record<WorkerName, () => Promise<WorkerDef>> = {
   visual: createVisualWorker,
-  speech: async () => ({ name: "speech", process: placeholderWork }),
+  speech: createSpeechWorker,
   sound: async () => ({ name: "sound", process: placeholderWork }),
 };
 

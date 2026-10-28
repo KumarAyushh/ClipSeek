@@ -1,11 +1,11 @@
 // Loads the ML models the workers use. Each loader is called ONCE per process, at startup,
 // and the loaded model is reused for every video (loading takes seconds; running is fast).
-// Day 6 adds Whisper + bge here, Day 7 adds CLAP. (Day 8 moves the loaders to
+// CLIP (Day 5), Whisper + bge (Day 6); Day 7 adds CLAP. (Day 8 moves the loaders to
 // packages/shared, because the API needs the text encoders for search.)
 
 import path from "node:path";
 import { config } from "@app/shared";
-import { AutoProcessor, CLIPVisionModelWithProjection, env } from "@huggingface/transformers";
+import { AutoProcessor, CLIPVisionModelWithProjection, env, pipeline } from "@huggingface/transformers";
 
 // Keep downloaded models in storage/models instead of deep inside node_modules,
 // so `bun install` never wipes them and they stay out of git (storage/ is ignored).
@@ -25,4 +25,18 @@ export async function loadClipVision() {
     CLIPVisionModelWithProjection.from_pretrained(config.models.clip, { dtype: DTYPE }),
   ]);
   return { processor, model };
+}
+
+// Whisper, for speech → text with timestamps. A "pipeline" bundles the three parts:
+// feature extractor (16 kHz samples → log-mel spectrogram), the model, and decoding
+// (tokens → text + timestamps), so we call it like one function.
+export function loadWhisper() {
+  return pipeline("automatic-speech-recognition", config.models.whisper, { dtype: DTYPE });
+}
+
+// bge-small, for text → 384-d vector. Used on transcript windows here, and on the search
+// query on Day 8 (same model, so both land in the same space).
+// The pipeline = tokenizer (text → token ids, cut at 512 tokens) + model (→ one vector per token).
+export function loadTextEmbedder() {
+  return pipeline("feature-extraction", config.models.textEmbed, { dtype: DTYPE });
 }
