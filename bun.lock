@@ -19,11 +19,11 @@
       "dependencies": {
         "@app/shared": "workspace:*",
         "express": "^5.3.0",
-        "multer": "2.5.0",
+        "multer": "^2.5.0",
       },
       "devDependencies": {
         "@types/express": "^5.0.6",
-        "@types/multer": "2.3.0",
+        "@types/multer": "^2.3.0",
       },
     },
     "apps/web": {
@@ -54,6 +54,7 @@
       "name": "@app/shared",
       "version": "0.0.0",
       "dependencies": {
+        "@huggingface/transformers": "^4.3.1",
         "kafkajs": "^2.2.4",
       },
     },

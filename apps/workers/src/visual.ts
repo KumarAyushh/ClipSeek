@@ -8,12 +8,11 @@
 
 import { mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
-import { config, sql } from "@app/shared";
+import { config, sql, toPgVector, toVectors } from "@app/shared";
+import { loadClipVision } from "@app/shared/models";
 import { RawImage } from "@huggingface/transformers";
 import { withHeartbeat } from "./heartbeat";
-import { loadClipVision } from "./models";
 import type { Job, WorkerDef } from "./runner";
-import { toPgVector, toVectors } from "./vectors";
 
 // 1 frame every 2 seconds (ffmpeg's fps=0.5). Enough for search, and a 5-min video = 150 frames.
 export const FRAME_INTERVAL_S = 2;

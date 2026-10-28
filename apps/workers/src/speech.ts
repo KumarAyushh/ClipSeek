@@ -9,13 +9,12 @@
 //
 // Postgres fills segments.tsv (the keyword-search column) from `text` by itself.
 
-import { sql } from "@app/shared";
+import { sql, toPgVector, toVectors } from "@app/shared";
+import { loadTextEmbedder, loadWhisper } from "@app/shared/models";
 import { hasAudioStream, readAudio } from "./audio";
 import { withHeartbeat } from "./heartbeat";
-import { loadTextEmbedder, loadWhisper } from "./models";
 import type { Job, WorkerDef } from "./runner";
 import { dropIsolatedWords, groupIntoWindows, type TranscriptWord } from "./transcript";
-import { toPgVector, toVectors } from "./vectors";
 
 // Whisper was trained on 16 kHz audio.
 const SAMPLE_RATE = 16_000;

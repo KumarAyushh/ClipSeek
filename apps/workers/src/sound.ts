@@ -7,13 +7,12 @@
 //             ──stack 16 + CLAP audio encoder, ONE call──▶ one 512-d vector per window
 //             ──one transaction──▶ DELETE old sounds rows, INSERT new ones
 
-import { sql } from "@app/shared";
+import { sql, toPgVector, toVectors } from "@app/shared";
+import { loadClapAudio } from "@app/shared/models";
 import { cat, type Tensor } from "@huggingface/transformers";
 import { hasAudioStream, readAudio } from "./audio";
-import { loadClapAudio } from "./models";
 import type { Job, WorkerDef } from "./runner";
 import { soundWindows } from "./soundWindows";
-import { toPgVector, toVectors } from "./vectors";
 
 // CLAP was trained on 48 kHz audio (NOT 16 kHz like Whisper). At 16 kHz it would "hear"
 // everything 3× too fast and give garbage vectors without any error.

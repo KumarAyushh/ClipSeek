@@ -1,5 +1,6 @@
 // Small helpers for the vectors (embeddings) the models return.
-// Used by every worker: visual (CLIP), speech (bge) and sound (CLAP).
+// Used by every worker (visual/CLIP, speech/bge, sound/CLAP) to store vectors, and by the
+// API (Day 8) to embed search queries the same way.
 
 import type { Tensor } from "@huggingface/transformers";
 

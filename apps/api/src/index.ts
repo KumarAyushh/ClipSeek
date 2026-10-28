@@ -1,11 +1,12 @@
 // HTTP API (Express).
-// Routes: GET /health, and /videos (upload, list, details, stream) from ./videos.
-// Later days add: GET /search.
+// Routes: GET /health, /videos (upload, list, details, stream) from ./videos,
+// and GET /search from ./search.
 
 import express, { type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
 import { config, sql } from "@app/shared";
 import { producer } from "./kafka";
+import { createSearchRouter } from "./search";
 import { videosRouter } from "./videos";
 
 const app = express();
@@ -26,6 +27,9 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/videos", videosRouter);
+// Loads the three text encoders (CLIP, bge, CLAP) once, here at startup, so the first search
+// isn't slow and a broken model crashes the API now instead of failing every search later.
+app.use("/search", await createSearchRouter());
 
 // Error handler: Express calls this when a route throws (Express 5 also catches
 // rejected promises from async routes). It must take 4 arguments to count as one.
