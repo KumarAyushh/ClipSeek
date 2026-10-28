@@ -1,5 +1,5 @@
 // Entry point for the background workers. Each worker is a Kafka consumer in its own group:
-//   visual-worker  -> frames   (CLIP)              Day 5
+//   visual-worker  -> frames   (CLIP)              Day 5 (visual.ts)
 //   speech-worker  -> segments (Whisper + bge)     Day 6
 //   sound-worker   -> sounds   (CLAP)              Day 7
 //
@@ -10,10 +10,11 @@
 
 import { sql, type Consumer } from "@app/shared";
 import { startWorker, type Job, type WorkerDef, type WorkerName } from "./runner";
+import { createVisualWorker } from "./visual";
 
-// Day 4 placeholder: check the video file exists, then pretend to work for 5 seconds,
-// sending a heartbeat every second, so you can watch the flow (and two copies working
-// at once). A missing file throws → the video is marked 'failed'. Days 5–7 replace it.
+// Day 4 placeholder for speech + sound: check the video file exists, then pretend to work
+// for 5 seconds, sending a heartbeat every second. A missing file throws → the video is
+// marked 'failed'. Days 6–7 replace it.
 async function placeholderWork(job: Job): Promise<void> {
   if (!(await Bun.file(job.filePath).exists())) {
     throw new Error(`video file not found: ${job.filePath}`);
@@ -24,15 +25,17 @@ async function placeholderWork(job: Job): Promise<void> {
   }
 }
 
-const WORKERS: Record<WorkerName, WorkerDef> = {
-  visual: { name: "visual", process: placeholderWork },
-  speech: { name: "speech", process: placeholderWork },
-  sound: { name: "sound", process: placeholderWork },
+// One "create" function per worker. Creating a worker loads its model(s), which takes
+// seconds and memory, so we only create the workers that were asked for.
+const WORKERS: Record<WorkerName, () => Promise<WorkerDef>> = {
+  visual: createVisualWorker,
+  speech: async () => ({ name: "speech", process: placeholderWork }),
+  sound: async () => ({ name: "sound", process: placeholderWork }),
 };
 
 // process.argv = [bun, src/index.ts, <worker name?>]
 const arg = process.argv[2];
-let selected: WorkerDef[];
+let selected: (() => Promise<WorkerDef>)[];
 if (arg === undefined) {
   selected = Object.values(WORKERS);
 } else if (arg === "visual" || arg === "speech" || arg === "sound") {
@@ -42,7 +45,10 @@ if (arg === undefined) {
   process.exit(1);
 }
 
-const consumers: Consumer[] = await Promise.all(selected.map(startWorker));
+// Load the models first, then start consuming. A model that fails to load crashes here,
+// before we take any messages from Kafka.
+const workers = await Promise.all(selected.map((create) => create()));
+const consumers: Consumer[] = await Promise.all(workers.map(startWorker));
 
 // Ctrl+C / docker stop: leave the consumer groups cleanly. Kafka then hands our partitions
 // to the other copies right away, instead of waiting for the session timeout (~30s)
