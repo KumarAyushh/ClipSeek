@@ -1,7 +1,8 @@
 // HTTP API (Express).
 // Routes: GET /health, /videos (upload, list, details, stream) from ./videos,
-// and GET /search from ./search.
+// GET /thumbs/... (frame thumbnails) and GET /search from ./search.
 
+import path from "node:path";
 import express, { type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
 import { config, sql } from "@app/shared";
@@ -27,6 +28,10 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/videos", videosRouter);
+// GET /thumbs/<videoId>/00081.jpg — the frame jpgs the visual worker wrote, used as search
+// result thumbnails. Only storage/thumbs is served (not videos/ or models/), and
+// express.static refuses paths with ".." that would climb out of it.
+app.use("/thumbs", express.static(path.join(config.storageDir, "thumbs")));
 // Loads the three text encoders (CLIP, bge, CLAP) once, here at startup, so the first search
 // isn't slow and a broken model crashes the API now instead of failing every search later.
 app.use("/search", await createSearchRouter());

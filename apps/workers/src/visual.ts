@@ -11,18 +11,12 @@ import path from "node:path";
 import { config, sql, toPgVector, toVectors } from "@app/shared";
 import { loadClipVision } from "@app/shared/models";
 import { RawImage } from "@huggingface/transformers";
+import { FRAME_INTERVAL_S, frameFileTimeS } from "./frameTime";
 import { withHeartbeat } from "./heartbeat";
 import type { Job, WorkerDef } from "./runner";
 
-// 1 frame every 2 seconds (ffmpeg's fps=0.5). Enough for search, and a 5-min video = 150 frames.
-export const FRAME_INTERVAL_S = 2;
 // How many frames go through CLIP in one call. Bigger = faster per frame but more memory.
 const BATCH_SIZE = 16;
-
-// Frame i (0-based) is at i × 2 seconds. Timestamps are always SECONDS, never the raw index.
-export function frameTimeS(index: number): number {
-  return index * FRAME_INTERVAL_S;
-}
 
 // Load CLIP once, then return the worker. index.ts only calls this when the visual worker
 // is selected, so `bun run start speech` never loads CLIP. A failed load crashes at startup
@@ -68,9 +62,8 @@ export async function createVisualWorker(): Promise<WorkerDef> {
     t = performance.now();
     const rows = files.map((file, i) => ({
       video_id: videoId,
-      // Index comes from the file name ("00050.jpg" → 50 → 100s), not the loop counter,
-      // so the timestamp is tied to the exact jpg it describes.
-      ts_s: frameTimeS(Number.parseInt(file, 10)),
+      // From the file name ("00050.jpg" → 100s), not the loop counter (see frameTime.ts).
+      ts_s: frameFileTimeS(file),
       thumb_path: path.join(thumbsRel, file),
       embedding: toPgVector(vectors[i]!),
     }));

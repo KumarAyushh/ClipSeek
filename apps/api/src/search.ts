@@ -1,19 +1,30 @@
-// GET /search?q=...&debug=1 — find the moments in the videos that match a text query.
+// GET /search?q=...[&debug=1] — find the moments in the videos that match a text query.
 //
-// Day 8 (this file): four retrievers, each on its own, each returning its top 20:
+// Four retrievers, each on its own, each returning its top 20:
 //
 //   q ──CLIP text──▶ vector ──▶ frames   (nearest frame vectors)    "visual":  what is SHOWN
 //     ──bge─────────▶ vector ──▶ segments (nearest transcript text)  "speech":  what is SAID (meaning)
 //     ──(raw text)──────────────▶ segments (Postgres full-text)       "keyword": what is SAID (exact words)
 //     ──CLAP text──▶ vector ──▶ sounds   (nearest 10s sound windows) "sound":   what is HEARD
 //
-// Day 9 adds a similarity cutoff per list, fuses the four lists with RRF into ONE ranked list
-// and makes that the normal response. Until then only `?debug=1` (the four lists side by side,
-// with scores) exists; without it the route answers 501 instead of pretending.
+// Then fusion.ts turns the four lists into ONE ranked list: cutoff per list → RRF on
+// "video + 10s bucket" → merge neighbouring buckets → top 10 results.
+// `?debug=1` also returns the four raw lists (before the cutoff) with their scores, the
+// cutoffs and timings, to see WHY a result ranked where it did.
 
 import { Router } from "express";
 import { sql, toPgVector } from "@app/shared";
 import { loadQueryEncoder } from "./encoders";
+import {
+  applyCutoff,
+  fuseRrf,
+  type Hit,
+  MIN_SCORE,
+  mergeNearby,
+  type SearchResult,
+  type Source,
+  SOURCES,
+} from "./fusion";
 
 // How many results each retriever returns. Fusion (Day 9) only needs the top of each list.
 const TOP_K = 20;
@@ -22,7 +33,7 @@ const MAX_QUERY_LENGTH = 200;
 
 // One row per retriever. `score` is higher = better in every list, but the SCALES differ:
 // the three vector lists give cosine similarity (−1..1), keyword gives ts_rank (0..~1, based
-// on word counts). That's why Day 9 fuses by RANK (RRF) and never compares scores across lists.
+// on word counts). That's why fusion goes by RANK (RRF) and never compares scores across lists.
 type FrameHit = {
   video_id: string;
   title: string;
@@ -46,6 +57,9 @@ type SoundHit = {
   score: number; // cosine similarity of the 10s window to the query
 };
 
+// One result in the response. thumb_url is served by the /thumbs static route (index.ts).
+type ResultBody = Omit<SearchResult, "thumb_path"> & { thumb_url: string | null };
+
 // Load the query encoders once (seconds), then return the router.
 export async function createSearchRouter(): Promise<Router> {
   const encodeQuery = await loadQueryEncoder();
@@ -58,11 +72,7 @@ export async function createSearchRouter(): Promise<Router> {
       res.status(400).json({ error: `q must be 1–${MAX_QUERY_LENGTH} characters` });
       return;
     }
-    // 501 Not Implemented: fused results (the normal response) arrive on Day 9.
-    if (req.query.debug !== "1") {
-      res.status(501).json({ error: "fused results are not built yet (Day 9); add &debug=1" });
-      return;
-    }
+    const debug = req.query.debug === "1";
 
     // 1. Embed the query with all three models (the slow part: tens of ms on CPU).
     let t = performance.now();
@@ -80,14 +90,67 @@ export async function createSearchRouter(): Promise<Router> {
     ]);
     const searchMs = Math.round(performance.now() - t);
 
+    // 3. Fuse (pure code in fusion.ts, ~0 ms). First put every list into the one Hit shape:
+    //    a frame is an instant, so its start and end are both ts_s. Segment and sound rows
+    //    already have start_s / end_s (and text) under the same names.
+    t = performance.now();
+    const lists: Record<Source, Hit[]> = {
+      visual: visual.map((f) => ({
+        video_id: f.video_id,
+        title: f.title,
+        start_s: f.ts_s,
+        end_s: f.ts_s,
+        score: f.score,
+        thumb_path: f.thumb_path ?? undefined,
+      })),
+      speech,
+      keyword,
+      sound,
+    };
+    // Cutoff each list with its own minimum (scores are only comparable within one list).
+    const kept: Partial<Record<Source, Hit[]>> = {};
+    for (const source of SOURCES) kept[source] = applyCutoff(lists[source], MIN_SCORE[source]);
+    const fused = mergeNearby(fuseRrf(kept));
+
+    // 4. Results found without a matching frame (only said or heard) get the frame nearest
+    //    to their start as a thumbnail. ≤ 10 tiny queries, run together.
+    const results: ResultBody[] = await Promise.all(
+      fused.map(async ({ thumb_path, ...r }) => {
+        const thumb = thumb_path ?? (await nearestThumb(r.video_id, r.start_s));
+        // thumb_path is relative to the storage dir ("thumbs/<id>/00081.jpg"), and /thumbs
+        // serves storage/thumbs, so the URL is the same path with a leading slash.
+        return { ...r, thumb_url: thumb ? `/${thumb}` : null };
+      }),
+    );
+    const fuseMs = Math.round(performance.now() - t);
+
+    if (!debug) {
+      res.json({ query: q, results });
+      return;
+    }
     res.json({
       query: q,
-      timings_ms: { embed: embedMs, search: searchMs },
-      lists: { visual, speech, keyword, sound },
+      results,
+      timings_ms: { embed: embedMs, search: searchMs, fuse: fuseMs },
+      cutoffs: MIN_SCORE,
+      lists: { visual, speech, keyword, sound }, // raw lists, BEFORE the cutoff
     });
   });
 
   return router;
+}
+
+// The frame closest to `timeS` in one video (frames are 2s apart, so ≤ 1s away).
+// null if the video has no frames. Uses the frames.video_id index; ≤ 150 rows per 5-min video.
+async function nearestThumb(videoId: string, timeS: number): Promise<string | null> {
+  const rows: { thumb_path: string | null }[] = await sql`
+    SELECT thumb_path
+    FROM frames
+    WHERE video_id = ${videoId}
+    ORDER BY abs(ts_s - ${timeS}::real)
+    LIMIT 1
+  `;
+  return rows[0]?.thumb_path ?? null;
 }
 
 // ---------- The four retrievers ----------
