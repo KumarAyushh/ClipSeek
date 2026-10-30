@@ -8,7 +8,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     ports:
-      - "127.0.0.1:5432:5432"
+      # host:container. 5433 on the host, so it can run next to another Postgres on 5432.
+      # DATABASE_URL in .env must use this host port.
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
