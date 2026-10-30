@@ -11,6 +11,9 @@
 // "video + 10s bucket" → merge neighbouring buckets → top 10 results.
 // `?debug=1` also returns the four raw lists (before the cutoff) with their scores, the
 // cutoffs and timings, to see WHY a result ranked where it did.
+//
+// One exception: a query like "person talking" asks whether someone speaks, not what they say,
+// so the speech list is replaced by the moments that have a transcript (speechQuery.ts).
 
 import { Router } from "express";
 import { sql, toPgVector } from "@app/shared";
@@ -25,6 +28,7 @@ import {
   type Source,
   SOURCES,
 } from "./fusion";
+import { asksOnlyForSpeech } from "./speechQuery";
 
 // How many results each retriever returns. Fusion (Day 9) only needs the top of each list.
 const TOP_K = 20;
@@ -84,7 +88,9 @@ export async function createSearchRouter(): Promise<Router> {
     t = performance.now();
     const [visual, speech, keyword, sound] = await Promise.all([
       searchFrames(toPgVector(vectors.clip)),
-      searchSegments(toPgVector(vectors.bge)),
+      // "person talking": comparing its MEANING with what people said is pointless, so the
+      // speech list becomes the moments where someone speaks (see speechQuery.ts).
+      asksOnlyForSpeech(q) ? searchSpeechMoments() : searchSegments(toPgVector(vectors.bge)),
       searchKeyword(q),
       searchSounds(toPgVector(vectors.clap)),
     ]);
@@ -212,6 +218,25 @@ function searchKeyword(q: string): Promise<SegmentHit[]> {
     JOIN videos v ON v.id = s.video_id
     WHERE s.tsv @@ query
     ORDER BY score DESC, s.id
+    LIMIT ${TOP_K}
+  `;
+}
+
+// Where does someone talk at all? Not a fifth retriever: it replaces the speech list for queries
+// like "person talking". There's no query to compare with, so to share the 20 places fairly it
+// takes the 1st window of every video, then the 2nd of every video, and so on (row_number numbers
+// each video's windows in time order). score = 1 passes the cutoff: a transcript window means
+// someone really spoke there.
+function searchSpeechMoments(): Promise<SegmentHit[]> {
+  return sql`
+    SELECT s.video_id, v.title, s.start_s, s.end_s, s.text, 1 AS score
+    FROM (
+      SELECT video_id, start_s, end_s, text,
+             row_number() OVER (PARTITION BY video_id ORDER BY start_s) AS nth
+      FROM segments
+    ) s
+    JOIN videos v ON v.id = s.video_id
+    ORDER BY s.nth, v.created_at DESC
     LIMIT ${TOP_K}
   `;
 }
