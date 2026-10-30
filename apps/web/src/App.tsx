@@ -4,7 +4,7 @@
 //   Videos   — upload form + the video list with its processing status
 // App owns the state the sections share: the video list and what the Player is playing.
 import { useCallback, useEffect, useState } from "react";
-import { listVideos, type VideoSummary } from "./api";
+import { deleteVideo, listVideos, type VideoSummary } from "./api";
 import { type PlayTarget, Player } from "./Player";
 import { Search } from "./Search";
 import { UploadForm } from "./UploadForm";
@@ -29,6 +29,19 @@ export default function App() {
       setListError(err instanceof Error ? err.message : String(err));
     }
   }, []);
+
+  // Remove a video. It can't be undone, so ask first (the browser's built-in dialog is enough).
+  async function handleRemove(video: VideoSummary) {
+    if (!window.confirm(`Remove "${video.title}"? This deletes the video and its search data.`)) return;
+    try {
+      await deleteVideo(video.id);
+      // Close the player if it was showing this video: its file is gone now.
+      setPlaying((current) => (current?.videoId === video.id ? null : current));
+      await refresh();
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   // Load the list once when the page opens.
   useEffect(() => {
@@ -61,8 +74,8 @@ export default function App() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Videos</h2>
         <UploadForm onUploaded={() => void refresh()} />
-        {listError && <p className="text-sm text-red-600">Could not load videos: {listError}</p>}
-        <VideoList videos={videos} onPlay={setPlaying} />
+        {listError && <p className="text-sm text-red-600">{listError}</p>}
+        <VideoList videos={videos} onPlay={setPlaying} onRemove={(v) => void handleRemove(v)} />
       </section>
     </main>
   );

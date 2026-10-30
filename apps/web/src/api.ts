@@ -71,6 +71,11 @@ export function uploadVideo(file: File, title: string): Promise<VideoSummary> {
   return request<VideoSummary>("/videos", { method: "POST", body: form });
 }
 
+// DELETE /videos/:id — answers 204 with an empty body, which request() reads as null.
+export async function deleteVideo(videoId: string): Promise<void> {
+  await request<null>(`/videos/${videoId}`, { method: "DELETE" });
+}
+
 // GET /search?q=... — the fused top 10. encodeURIComponent so "&", "#", spaces etc. stay
 // part of the query instead of breaking the URL.
 export function searchVideos(q: string): Promise<SearchResponse> {

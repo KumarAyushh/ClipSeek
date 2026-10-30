@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --continue=always",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck && tsc --noEmit",
     "test": "bun test",

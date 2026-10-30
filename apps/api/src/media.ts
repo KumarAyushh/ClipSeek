@@ -22,12 +22,17 @@ async function run(cmd: string[]): Promise<string> {
 //   (a few seconds even for a big file) and the quality doesn't change.
 // - `-movflags +faststart`: write the moov atom first. A browser needs it before it can
 //   play or seek, so with it at the front playback starts right away.
+// - `-map 0:v:0 -map 0:a:0?`: keep only the first video track and the first audio track (`?` =
+//   fine if there's none). Subtitle or data tracks (common in mkv files and phone videos) can
+//   make an mp4 output fail, and nothing here uses them.
 // - `-nostdin`: ffmpeg must never wait for keyboard input inside a server.
 // - `-y`: overwrite `output` if it already exists.
 export async function faststart(input: string, output: string): Promise<void> {
   await run([
     "ffmpeg", "-nostdin", "-v", "error", "-y",
     "-i", input,
+    "-map", "0:v:0",
+    "-map", "0:a:0?",
     "-c", "copy",
     "-movflags", "+faststart",
     output,

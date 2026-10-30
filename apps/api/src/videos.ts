@@ -140,6 +140,29 @@ videosRouter.get("/:id", async (req, res) => {
   res.json(video);
 });
 
+// DELETE /videos/:id — remove a video and everything made from it.
+// Allowed in ANY status: a video stuck in 'processing' is exactly what you'd want to clear out.
+//
+// - The row goes first. ON DELETE CASCADE removes its frames, segments and sounds with it, so the
+//   video leaves search in one step. If removing a file then fails, the worst case is an unused
+//   file on disk, never a search result pointing at a missing video.
+// - `force: true` = no error if the file is already gone.
+// - A message still waiting in Kafka is harmless: the worker finds no file or row, fails that job,
+//   and marking it failed updates 0 rows. A worker in the middle of this video can leave its
+//   thumbnails folder behind (it writes after we delete); that's only wasted disk space.
+videosRouter.delete("/:id", async (req, res) => {
+  const video = await findVideo(req.params.id);
+  if (!video) {
+    res.status(404).json({ error: "Video not found" });
+    return;
+  }
+  await sql`DELETE FROM videos WHERE id = ${video.id}`;
+  await fs.promises.rm(path.join(config.storageDir, video.file_path), { force: true });
+  await fs.promises.rm(path.join(config.storageDir, "thumbs", video.id), { recursive: true, force: true });
+  // 204 No Content = it worked, and there's nothing to send back.
+  res.status(204).end();
+});
+
 // GET /videos/:id/stream — the mp4 itself, for a <video src="..."> tag.
 // res.sendFile handles HTTP range requests for us: when the player seeks, the browser
 // sends `Range: bytes=N-` and gets `206 Partial Content` with only that slice.

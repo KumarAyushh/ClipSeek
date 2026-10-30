@@ -9,6 +9,11 @@
 
 import path from "node:path";
 import { config, createKafka, KafkaJSError, sql, type Consumer, type VideoUploadedEvent } from "@app/shared";
+import { withHeartbeat } from "./heartbeat";
+import { createTurnQueue } from "./turns";
+
+// One queue per process: workers in the same process run their models one at a time (turns.ts).
+const takeTurn = createTurnQueue();
 
 export type WorkerName = "visual" | "speech" | "sound";
 
@@ -63,7 +68,10 @@ export async function startWorker(worker: WorkerDef): Promise<Consumer> {
 
       console.log(`${tag} start ${event.videoId} (${where})`);
       const started = performance.now();
+      const turn = takeTurn();
       try {
+        // Waiting in line can take minutes, so keep telling Kafka we're alive meanwhile.
+        await withHeartbeat(turn.ready, heartbeat);
         await worker.process({
           videoId: event.videoId,
           filePath: path.join(config.storageDir, event.filePath),
@@ -82,6 +90,8 @@ export async function startWorker(worker: WorkerDef): Promise<Consumer> {
         // If THIS query throws (e.g. DB down), the error escapes, nothing is committed,
         // and the message comes back later. So a failure is never silently lost.
         await markFailed(worker.name, event.videoId, reason);
+      } finally {
+        turn.release(); // success, failure or Kafka error: the next worker can go now
       }
 
       // The outcome (done or failed) is saved in the DB, so the message is handled.

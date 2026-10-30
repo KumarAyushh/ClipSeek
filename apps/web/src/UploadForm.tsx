@@ -16,7 +16,12 @@ export function UploadForm({ onUploaded }: { onUploaded: () => void }) {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); // stop the browser's own form submit (a full page reload)
-    if (!file) return;
+    if (!file) {
+      // The button stays clickable with no file on purpose: a greyed-out button that silently
+      // ignores clicks looks broken. Saying what's missing is clearer.
+      setError("Pick a video file first");
+      return;
+    }
     setUploading(true);
     setError(null);
     try {
@@ -26,7 +31,7 @@ export function UploadForm({ onUploaded }: { onUploaded: () => void }) {
       setTitle("");
       onUploaded(); // App reloads the list → the new video shows up as "processing"
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setUploading(false);
     }
@@ -38,8 +43,13 @@ export function UploadForm({ onUploaded }: { onUploaded: () => void }) {
         type="file"
         accept="video/*"
         // files is a FileList (or null); we only allow one file
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className="text-sm"
+        onChange={(e) => {
+          setFile(e.target.files?.[0] ?? null);
+          setError(null); // a new file clears the old message
+        }}
+        // Tailwind's reset removes the browser's styling, so "Choose File" would look like plain
+        // text. `file:` classes style that button, which sits inside the <input>.
+        className="text-sm file:mr-2 file:cursor-pointer file:rounded file:border file:bg-white file:px-3 file:py-1 file:text-sm hover:file:bg-gray-100"
       />
       <input
         type="text"
@@ -50,12 +60,12 @@ export function UploadForm({ onUploaded }: { onUploaded: () => void }) {
       />
       <button
         type="submit"
-        disabled={!file || uploading}
+        disabled={uploading}
         className="rounded bg-gray-900 px-3 py-1 text-sm text-white disabled:opacity-40"
       >
         {uploading ? "Uploading…" : "Upload"}
       </button>
-      {error && <p className="w-full text-sm text-red-600">Upload failed: {error}</p>}
+      {error && <p className="w-full text-sm text-red-600">{error}</p>}
     </form>
   );
 }
