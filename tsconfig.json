@@ -1,5 +1,5 @@
 {
-  // Typechecks the root scripts/ folder. Each app and package has its own tsconfig.json.
+  // Typechecks the root scripts/ and eval/ folders. Each app and package has its own tsconfig.json.
   "extends": "./tsconfig.base.json",
-  "include": ["scripts"]
+  "include": ["scripts", "eval"]
 }

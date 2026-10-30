@@ -1,0 +1,77 @@
+{
+  "videos": [
+    { "title": "JFK Rice speech", "clip": "360s to 660s", "license": "Public domain (NASA / US government)", "source": "https://commons.wikimedia.org/wiki/File:President_Kennedy_speech_on_the_space_effort_at_Rice_University,_September_12,_1962.ogv" },
+    { "title": "Duck and Cover", "clip": "whole film, 555s", "license": "Public domain", "source": "https://archive.org/details/DuckandC1951" },
+    { "title": "Big Buck Bunny", "clip": "first 300s", "license": "CC BY 3.0, Blender Foundation", "source": "https://archive.org/details/BigBuckBunny_124" },
+    { "title": "Sintel", "clip": "first 300s", "license": "CC BY 3.0, Blender Foundation", "source": "https://archive.org/details/Sintel" },
+    {
+      "title": "Sound reel",
+      "clip": "real clips joined one after another, boundaries measured from each clip's length",
+      "parts": [
+        { "start_s": 0, "end_s": 8.36, "label": "dog barking", "license": "CC BY-SA 3.0", "source": "https://commons.wikimedia.org/wiki/File:Labrador_barking_on_command.theora.ogv" },
+        { "start_s": 8.36, "end_s": 21.44, "label": "dog barking", "license": "CC BY 3.0", "source": "https://commons.wikimedia.org/wiki/File:Shiba_hond_die_wil_wandelen,_-Oct,_2012_a.ogv" },
+        { "start_s": 21.44, "end_s": 61.52, "label": "birds and a rooster at dawn", "license": "CC BY 3.0", "source": "https://commons.wikimedia.org/wiki/File:Zgornja_Kungota_Slovenija_-_Ptice,_petelini,_gozd,_zgodnje_jutro.webm" },
+        { "start_s": 61.52, "end_s": 104.72, "label": "church bells", "license": "CC BY-SA 4.0", "source": "https://commons.wikimedia.org/wiki/File:Kazansky_Bogoroditsky_Monastery_bell_ringing_(2022-07-05)_02.webm" },
+        { "start_s": 104.72, "end_s": 144.76, "label": "thunder (overdubbed by the uploader)", "license": "CC BY 3.0", "source": "https://commons.wikimedia.org/wiki/File:Lightning_Storm_in_Rolla.webm" },
+        { "start_s": 144.76, "end_s": 186.14, "label": "fireworks", "license": "CC BY-SA 4.0", "source": "https://commons.wikimedia.org/wiki/File:Fireworks_Naperville_2022.webm" }
+      ]
+    },
+    {
+      "title": "Sound reel 2",
+      "clip": "audio recordings joined one after another over a plain grey picture",
+      "parts": [
+        { "start_s": 0, "end_s": 40, "label": "orchestra (Beethoven 5, 4th movement)", "license": "EEF OAL-1", "source": "https://commons.wikimedia.org/wiki/File:Ludwig_van_Beethoven_-_Symphonie_5_c-moll_-_4._Allegro.ogg" },
+        { "start_s": 40, "end_s": 65.16, "label": "applause in a theater", "license": "CC BY 3.0", "source": "https://commons.wikimedia.org/wiki/File:Applause-2.ogg" },
+        { "start_s": 65.16, "end_s": 102.57, "label": "applause", "license": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Slow_starting_applause.ogg" }
+      ]
+    }
+  ],
+  "queries": [
+    { "q": "a big rabbit holding a red apple", "kind": "visual", "note": "contact sheet", "expect": [{ "title": "Big Buck Bunny", "start_s": 85, "end_s": 97 }] },
+    { "q": "butterfly sitting on a rabbit's head", "kind": "visual", "note": "contact sheet", "expect": [{ "title": "Big Buck Bunny", "start_s": 103, "end_s": 110 }] },
+    { "q": "squirrel on a tree trunk", "kind": "visual", "note": "contact sheet", "expect": [{ "title": "Big Buck Bunny", "start_s": 124, "end_s": 144 }] },
+    { "q": "two people fighting in the snow", "kind": "visual", "note": "contact sheet", "expect": [{ "title": "Sintel", "start_s": 36, "end_s": 62 }] },
+    { "q": "snowy mountains", "kind": "visual", "note": "contact sheet", "expect": [{ "title": "Sintel", "start_s": 10, "end_s": 30 }, { "title": "Sintel", "start_s": 80, "end_s": 98 }] },
+    { "q": "small dragon on a rooftop", "kind": "visual", "note": "contact sheet", "expect": [{ "title": "Sintel", "start_s": 196, "end_s": 218 }, { "title": "Sintel", "start_s": 272, "end_s": 284 }] },
+    { "q": "cartoon turtle", "kind": "visual", "note": "contact sheet", "expect": [{ "title": "Duck and Cover", "start_s": 10, "end_s": 75 }, { "title": "Duck and Cover", "start_s": 155, "end_s": 165 }, { "title": "Duck and Cover", "start_s": 295, "end_s": 305 }, { "title": "Duck and Cover", "start_s": 525, "end_s": 545 }] },
+    { "q": "a school bus", "kind": "visual", "note": "contact sheet", "expect": [{ "title": "Duck and Cover", "start_s": 442, "end_s": 447 }] },
+    { "q": "black dog", "kind": "visual", "note": "reel cut points", "expect": [{ "title": "Sound reel", "start_s": 0, "end_s": 8.36 }] },
+    { "q": "white church with blue domes", "kind": "visual", "note": "reel cut points", "expect": [{ "title": "Sound reel", "start_s": 61.52, "end_s": 104.72 }] },
+    { "q": "lightning over a town at night", "kind": "visual", "note": "reel cut points", "expect": [{ "title": "Sound reel", "start_s": 104.72, "end_s": 144.76 }] },
+
+    { "q": "going to the moon because it is hard", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "JFK Rice speech", "start_s": 160, "end_s": 180 }] },
+    { "q": "will space be peaceful or a place of war", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "JFK Rice speech", "start_s": 88, "end_s": 95 }] },
+    { "q": "how strong are the new rockets", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "JFK Rice speech", "start_s": 228, "end_s": 262 }] },
+    { "q": "satellites launched by America versus Russia", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "JFK Rice speech", "start_s": 279, "end_s": 295 }] },
+    { "q": "what to do on a bus during an attack", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "Duck and Cover", "start_s": 445, "end_s": 457 }] },
+    { "q": "broken windows can injure you", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "Duck and Cover", "start_s": 331, "end_s": 337 }, { "title": "Duck and Cover", "start_s": 455, "end_s": 458 }] },
+    { "q": "protect your skin with a newspaper", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "Duck and Cover", "start_s": 476, "end_s": 482 }] },
+    { "q": "how will we know an attack is coming", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "Duck and Cover", "start_s": 204, "end_s": 230 }] },
+    { "q": "sword with a violent history", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "Sintel", "start_s": 108, "end_s": 115 }] },
+    { "q": "looking for a lost dragon", "kind": "speech", "note": "paraphrase, word times", "expect": [{ "title": "Sintel", "start_s": 135, "end_s": 145 }] },
+    { "q": "person talking", "kind": "speech", "note": "any real speech; asks whether someone speaks", "expect": [{ "title": "JFK Rice speech", "start_s": 0, "end_s": 300 }, { "title": "Duck and Cover", "start_s": 50, "end_s": 551 }, { "title": "Sintel", "start_s": 107, "end_s": 155 }] },
+
+    { "q": "Cape Canaveral", "kind": "keyword", "note": "exact words, word times", "expect": [{ "title": "JFK Rice speech", "start_s": 264, "end_s": 267 }] },
+    { "q": "Mariner spacecraft", "kind": "keyword", "note": "exact words, word times", "expect": [{ "title": "JFK Rice speech", "start_s": 295, "end_s": 297 }] },
+    { "q": "Cub Scout", "kind": "keyword", "note": "exact words, word times", "expect": [{ "title": "Duck and Cover", "start_s": 402, "end_s": 404 }] },
+
+    { "q": "dog barking", "kind": "sound", "note": "reel cut points", "expect": [{ "title": "Sound reel", "start_s": 0, "end_s": 21.44 }] },
+    { "q": "birds singing", "kind": "sound", "note": "reel cut points", "expect": [{ "title": "Sound reel", "start_s": 21.44, "end_s": 61.52 }] },
+    { "q": "church bells ringing", "kind": "sound", "note": "reel cut points", "expect": [{ "title": "Sound reel", "start_s": 61.52, "end_s": 104.72 }] },
+    { "q": "thunder", "kind": "sound", "note": "reel cut points", "expect": [{ "title": "Sound reel", "start_s": 104.72, "end_s": 144.76 }] },
+    { "q": "fireworks exploding", "kind": "sound", "note": "reel cut points", "expect": [{ "title": "Sound reel", "start_s": 144.76, "end_s": 186.14 }] },
+    { "q": "audience applauding", "kind": "sound", "note": "reel cut points", "expect": [{ "title": "Sound reel 2", "start_s": 40, "end_s": 102.57 }] },
+    { "q": "orchestra playing", "kind": "sound", "note": "reel cut points", "expect": [{ "title": "Sound reel 2", "start_s": 0, "end_s": 40 }] },
+    { "q": "air raid siren", "kind": "sound", "note": "the pauses after 'when the signal comes' and 'when the warning comes'; the weakest label, the siren was not heard directly", "expect": [{ "title": "Duck and Cover", "start_s": 236, "end_s": 241 }, { "title": "Duck and Cover", "start_s": 255, "end_s": 259 }] }
+  ],
+  "negatives": [
+    "red sports car",
+    "cooking pasta",
+    "football match",
+    "airplane taking off",
+    "underwater coral reef",
+    "baby crying",
+    "ocean waves",
+    "typing on a keyboard"
+  ]
+}

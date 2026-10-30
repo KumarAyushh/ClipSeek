@@ -13,6 +13,7 @@
     "test": "bun test",
     "db:migrate": "bun --env-file=.env scripts/migrate.ts",
     "kafka:setup": "bun --env-file=.env scripts/create-topics.ts",
+    "eval": "bun --env-file=.env eval/run.ts",
     "spike": "bun --env-file=.env apps/workers/scripts/spike.ts"
   },
   "devDependencies": {
