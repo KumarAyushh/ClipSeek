@@ -15,6 +15,9 @@ import { createTurnQueue } from "./turns";
 // One queue per process: workers in the same process run their models one at a time (turns.ts).
 const takeTurn = createTurnQueue();
 
+// How often to force a garbage collection while a worker runs (see withForcedGc below).
+const GC_INTERVAL_MS = 500;
+
 export type WorkerName = "visual" | "speech" | "sound";
 
 // What a worker gets for one video.
@@ -72,11 +75,13 @@ export async function startWorker(worker: WorkerDef): Promise<Consumer> {
       try {
         // Waiting in line can take minutes, so keep telling Kafka we're alive meanwhile.
         await withHeartbeat(turn.ready, heartbeat);
-        await worker.process({
-          videoId: event.videoId,
-          filePath: path.join(config.storageDir, event.filePath),
-          heartbeat,
-        });
+        await withForcedGc(() =>
+          worker.process({
+            videoId: event.videoId,
+            filePath: path.join(config.storageDir, event.filePath),
+            heartbeat,
+          }),
+        );
         await markDone(worker.name, event.videoId);
         const seconds = ((performance.now() - started) / 1000).toFixed(1);
         console.log(`${tag} done  ${event.videoId} in ${seconds}s`);
@@ -101,6 +106,20 @@ export async function startWorker(worker: WorkerDef): Promise<Consumer> {
 
   console.log(`${tag} listening on "${config.kafka.topicVideoUploaded}"`);
   return consumer;
+}
+
+// Run `work` with the garbage collector on a timer.
+// The models make many tensors, and their real data sits in native memory (outside JS). The
+// collector only sees tiny JS objects, so it feels no pressure to run, and that native memory is
+// only freed when it does. Left alone, Whisper passed 2.5 GB on a 60s clip and CLAP grew ~450 MB
+// per video. Only the worker whose turn it is needs this, so it doesn't run while waiting in line.
+async function withForcedGc<T>(work: () => Promise<T>): Promise<T> {
+  const timer = setInterval(() => Bun.gc(true), GC_INTERVAL_MS);
+  try {
+    return await work();
+  } finally {
+    clearInterval(timer);
+  }
 }
 
 // Turn the raw message bytes back into a VideoUploadedEvent. Returns null if it isn't one.

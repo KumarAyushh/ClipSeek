@@ -30,6 +30,13 @@ env.cacheDir = path.join(config.storageDir, "models");
 // Full-precision weights (the CPU default, written out so it's visible). See Decisions log.
 const DTYPE = "fp32";
 
+// onnxruntime normally keeps a big pool of memory (its "arena") and plans allocations in advance
+// (its "memory pattern") for speed, and doesn't give that memory back. That adds up in the workers
+// process, where four models share one process, so Whisper and CLAP audio turn both off.
+// Measured: Whisper peak 2148 → 1836 MB (~20% slower); CLAP after 2 videos 1272 → 400 MB (same
+// speed). Words, timestamps and vectors stayed identical. CLIP showed no gain, so it keeps them.
+const LOW_MEMORY_SESSION = { enableCpuMemArena: false, enableMemPattern: false };
+
 // ---------- CLIP: images (frames) and text (queries) in one 512-d space ----------
 
 // CLIP's IMAGE side, for frames (visual worker).
@@ -62,7 +69,10 @@ export async function loadClipText() {
 // spectrogram), the model, and decoding (tokens → text + timestamps), so we call it like
 // one function. Speech worker only.
 export function loadWhisper() {
-  return pipeline("automatic-speech-recognition", config.models.whisper, { dtype: DTYPE });
+  return pipeline("automatic-speech-recognition", config.models.whisper, {
+    dtype: DTYPE,
+    session_options: LOW_MEMORY_SESSION,
+  });
 }
 
 // ---------- bge-small: text → 384-d vector ----------
@@ -85,7 +95,10 @@ export function loadTextEmbedder() {
 export async function loadClapAudio() {
   const [processor, model] = await Promise.all([
     AutoProcessor.from_pretrained(config.models.clap),
-    ClapAudioModelWithProjection.from_pretrained(config.models.clap, { dtype: DTYPE }),
+    ClapAudioModelWithProjection.from_pretrained(config.models.clap, {
+      dtype: DTYPE,
+      session_options: LOW_MEMORY_SESSION,
+    }),
   ]);
   return { processor, model };
 }
