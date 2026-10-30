@@ -2,8 +2,10 @@
 //
 //   video.mp4 ──ffmpeg──▶ 16 kHz mono float samples
 //             ──Whisper, word timestamps──▶ words: { text, start_s, end_s }
-//             ──dropIsolatedWords()──▶ minus words Whisper invented in silence (transcript.ts)
+//             ──fixWordTimes()──▶ no 28s "words" (transcript.ts)
+//             ──dropIsolatedPhrases()──▶ minus words Whisper invented in silence (transcript.ts)
 //             ──groupIntoWindows()──▶ ~30s windows with 5s overlap (transcript.ts)
+//             ──dropUnheardWindows()──▶ minus text Whisper made up on noise (transcript.ts)
 //             ──bge-small, 16 windows per call──▶ one 384-d vector per window
 //             ──one transaction──▶ DELETE old segments rows, INSERT new ones
 //
@@ -14,7 +16,13 @@ import { loadTextEmbedder, loadWhisper } from "@app/shared/models";
 import { hasAudioStream, readAudio } from "./audio";
 import { withHeartbeat } from "./heartbeat";
 import type { Job, WorkerDef } from "./runner";
-import { dropIsolatedWords, groupIntoWindows, type TranscriptWord } from "./transcript";
+import {
+  dropIsolatedPhrases,
+  dropUnheardWindows,
+  fixWordTimes,
+  groupIntoWindows,
+  type TranscriptWord,
+} from "./transcript";
 
 // Whisper was trained on 16 kHz audio.
 const SAMPLE_RATE = 16_000;
@@ -59,12 +67,14 @@ export async function createSpeechWorker(): Promise<WorkerDef> {
     //    real time on CPU, so minutes for a long video). withHeartbeat keeps Kafka informed.
     t = performance.now();
     const allWords = hasAudio ? await transcribe(whisper, audio, heartbeat) : [];
-    const words = dropIsolatedWords(allWords);
+    // fixWordTimes first: a stretched word would hide the silence dropIsolatedPhrases looks for.
+    const words = dropIsolatedPhrases(fixWordTimes(allWords));
     const transcribeS = seconds(t);
 
     // 3. Group into ~30s windows, then embed them in batches: one bge call per batch of 16.
     t = performance.now();
-    const windows = groupIntoWindows(words);
+    const allWindows = groupIntoWindows(words);
+    const windows = dropUnheardWindows(allWindows);
     const vectors: Float32Array[] = [];
     for (let i = 0; i < windows.length; i += BATCH_SIZE) {
       const texts = windows.slice(i, i + BATCH_SIZE).map((w) => w.text);
@@ -98,6 +108,7 @@ export async function createSpeechWorker(): Promise<WorkerDef> {
     console.log(
       `[speech] ${videoId}: ${audioLength}s audio → ${words.length} words` +
         ` (${allWords.length - words.length} isolated dropped) → ${rows.length} segments` +
+        ` (${allWindows.length - rows.length} unheard dropped)` +
         ` | audio ${audioS}s | transcribe ${transcribeS}s | embed ${embedS}s | save ${saveS}s`,
     );
   }

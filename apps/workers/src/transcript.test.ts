@@ -1,7 +1,13 @@
-// Unit tests for transcript.ts (dropping made-up words, ~30s windows with 5s overlap).
+// Unit tests for transcript.ts (cleaning up made-up words, ~30s windows with 5s overlap).
 
 import { describe, expect, test } from "bun:test";
-import { dropIsolatedWords, groupIntoWindows, type TranscriptWord } from "./transcript";
+import {
+  dropIsolatedPhrases,
+  dropUnheardWindows,
+  fixWordTimes,
+  groupIntoWindows,
+  type TranscriptWord,
+} from "./transcript";
 
 // A 0.5s word starting at `start_s`.
 const word = (start_s: number, text = `w${start_s}`): TranscriptWord => ({
@@ -10,26 +16,57 @@ const word = (start_s: number, text = `w${start_s}`): TranscriptWord => ({
   end_s: start_s + 0.5,
 });
 
-describe("dropIsolatedWords", () => {
-  test("drops a word with ≥ 3s of silence on both sides (Whisper's lone 'you')", () => {
-    const words = [word(0), word(1), word(10, "you"), word(20), word(21)];
-    expect(dropIsolatedWords(words).map((w) => w.text)).toEqual(["w0", "w1", "w20", "w21"]);
+describe("fixWordTimes", () => {
+  test("cuts a word stretched over a pause, keeps its start", () => {
+    // The real case: a made-up "I'm" that Whisper stretched over 28s of silence.
+    const [w] = fixWordTimes([{ text: "I'm", start_s: 21.4, end_s: 49.38 }]);
+    expect(w).toEqual({ text: "I'm", start_s: 21.4, end_s: 23.4 });
   });
 
-  test("keeps a word with a close neighbour on ONE side", () => {
-    // w5 has 3.5s of silence before it but only 0.5s after it → real speech.
-    // (w0 needs w1: alone, w0 would itself be isolated and correctly dropped.)
-    const words = [word(0), word(1), word(5), word(6)];
-    expect(dropIsolatedWords(words)).toHaveLength(4);
+  test("an end before the start becomes a zero-length word", () => {
+    const [w] = fixWordTimes([{ text: "little", start_s: 169.98, end_s: 140 }]);
+    expect(w!.end_s).toBe(169.98);
+  });
+
+  test("leaves normal words alone", () => {
+    const words = [word(1), word(2)];
+    expect(fixWordTimes(words)).toEqual(words);
+  });
+});
+
+describe("dropIsolatedPhrases", () => {
+  // Four words, one per second, so a phrase that is long enough to keep.
+  const speech = (start_s: number) => [0, 1, 2, 3].map((i) => word(start_s + i));
+
+  test("drops up to 3 words with ≥ 3s of silence on both sides", () => {
+    const words = [...speech(0), word(10, "you"), word(10.5, "I'm"), ...speech(20)];
+    const texts = dropIsolatedPhrases(words).map((w) => w.text);
+    expect(texts).not.toContain("you");
+    expect(texts).not.toContain("I'm");
+    expect(texts).toHaveLength(8);
+  });
+
+  test("keeps a phrase of 4 words", () => {
+    expect(dropIsolatedPhrases(speech(10))).toHaveLength(4);
+  });
+
+  test("words closer than 3s stay in one phrase", () => {
+    // w6 has 2.5s of silence before it, so it's part of the same 5-word phrase.
+    const words = [...speech(0), word(6)];
+    expect(dropIsolatedPhrases(words)).toHaveLength(5);
   });
 
   test("a single word has no neighbours at all → dropped", () => {
-    expect(dropIsolatedWords([word(12, "you")])).toEqual([]);
+    expect(dropIsolatedPhrases([word(12, "you")])).toEqual([]);
+  });
+
+  test("no words → no words", () => {
+    expect(dropIsolatedPhrases([])).toEqual([]);
   });
 
   test("works on unsorted input", () => {
-    const words = [word(21), word(10, "you"), word(0), word(20), word(1)];
-    expect(dropIsolatedWords(words).map((w) => w.start_s)).toEqual([0, 1, 20, 21]);
+    const words = [word(21), word(1), word(10, "you"), word(0), word(20), word(2), word(3)];
+    expect(dropIsolatedPhrases(words).map((w) => w.start_s)).toEqual([0, 1, 2, 3]);
   });
 });
 
@@ -55,7 +92,7 @@ describe("groupIntoWindows", () => {
 
   test("window times come from its words, not the grid", () => {
     const [w] = groupIntoWindows([word(3.2), word(4)]);
-    expect(w).toEqual({ start_s: 3.2, end_s: 4.5, text: "w3.2 w4" });
+    expect(w).toEqual({ start_s: 3.2, end_s: 4.5, text: "w3.2 w4", zero_length_share: 0 });
   });
 
   test("a word still being spoken when a window starts belongs to it too", () => {
@@ -72,8 +109,32 @@ describe("groupIntoWindows", () => {
     expect(groupIntoWindows(words).map((w) => w.start_s)).toEqual([0, 100]);
   });
 
+  test("counts the share of words with no length", () => {
+    const noLength: TranscriptWord = { text: "fake", start_s: 1, end_s: 1 };
+    const [w] = groupIntoWindows([word(0), noLength, word(2), word(3)]);
+    expect(w!.zero_length_share).toBe(0.25);
+  });
+
   test("words come out in spoken order even if the input isn't sorted", () => {
     const [w] = groupIntoWindows([word(2, "c"), word(0, "a"), word(1, "b")]);
     expect(w!.text).toBe("a b c");
+  });
+});
+
+describe("dropUnheardWindows", () => {
+  const window = (text: string, zero_length_share: number) => ({
+    start_s: 0,
+    end_s: 30,
+    text,
+    zero_length_share,
+  });
+
+  test("drops a window when at least half of its words have no length", () => {
+    const windows = [window("real speech", 0.02), window("half", 0.5), window("loop", 0.9)];
+    expect(dropUnheardWindows(windows).map((w) => w.text)).toEqual(["real speech"]);
+  });
+
+  test("keeps a window that is only partly made up", () => {
+    expect(dropUnheardWindows([window("mixed", 0.49)])).toHaveLength(1);
   });
 });
