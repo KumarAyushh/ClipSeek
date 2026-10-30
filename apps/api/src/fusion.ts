@@ -34,20 +34,22 @@ export type Hit = {
 };
 
 // Minimum similarity per list; hits below it are dropped before fusion. null = no cutoff.
-// Set on Day 9 from the test videos: the best score for a query that SHOULD match vs one that
-// shouldn't (see progress.md Decisions). Day 11's eval re-tunes them.
-//   visual  (CLIP):  matches 0.256–0.314, non-matches up to 0.232  → 0.25 (thin margin: CLIP
+// Set on Day 11 from real footage: 33 labeled queries + 8 with no right answer (eval/queries.json).
+// The Day 9 values came from synthetic clips and were wrong on real video in both directions.
+// Scores below are the weakest real match vs the strongest query with no right answer.
+//   visual  (CLIP):  matches from 0.256, non-matches up to 0.268  → 0.27 (very thin margin: CLIP
 //                    text↔image scores are low and close together)
-//   speech  (bge):   matches 0.61–0.69,   non-matches up to 0.555  → 0.58 (bge scores even
-//                    unrelated text ~0.4–0.5)
+//   speech  (bge):   matches from 0.582, non-matches up to 0.594  → 0.58 (0.60 lost two real
+//                    matches to remove one false one)
 //   keyword:         a keyword hit means the words are really there → no cutoff
-//   sound   (CLAP):  matches 0.48–0.57,   non-matches up to 0.409 (silence right after the
-//                    TED talk, for "beep tone")                    → 0.44 (the midpoint)
+//   sound   (CLAP):  matches from 0.325, non-matches up to 0.304  → 0.32 ("football match" still
+//                    gets through at 0.493: CLAP hears the crowd in the JFK speech)
+// These are rough values: tuning on half the queries gave different speech and sound numbers.
 export const MIN_SCORE: Record<Source, number | null> = {
-  visual: 0.25,
+  visual: 0.27,
   speech: 0.58,
   keyword: null,
-  sound: 0.44,
+  sound: 0.32,
 };
 
 // RRF's k: score = Σ 1 / (k + rank). A big k (60, the value from the RRF paper) flattens the
@@ -76,6 +78,7 @@ export type Moment = {
 };
 
 // One result of /search: one or more neighbouring moments of one video.
+// start_s is where the player jumps (the best moment), end_s where the last moment ends.
 export type SearchResult = Omit<Moment, "bucket">;
 
 // Step 1: keep only hits at or above the cutoff. Lists come sorted best-first, so this keeps
@@ -161,7 +164,8 @@ export function fuseRrf(
 //   merged (gap ≤ 10s):          [16, 17, 19] → one result from 160s, score 0.033    [25] alone
 //
 // A merged result:
-// - starts at its EARLIEST moment (the player jumps to the start of the matching scene)
+// - jumps to its BEST moment, not the earliest. Hits chain together, so a run can be long (one
+//   query gave 48s–146s, with the real match at 103s) and its start can be a minute too early.
 // - scores as its BEST moment (max, not sum: a long scene shouldn't beat a precise hit just
 //   by being long)
 // - takes its snippet and thumbnail from its best moment that has one
@@ -206,7 +210,7 @@ function mergeRun(run: Moment[]): SearchResult {
   return {
     video_id: run[0]!.video_id,
     title: run[0]!.title,
-    start_s: Math.min(...run.map((m) => m.start_s)),
+    start_s: best[0]!.start_s,
     end_s: Math.max(...run.map((m) => m.end_s)),
     score: best[0]!.score,
     // Every list that matched any part of the run, in the fixed SOURCES order.

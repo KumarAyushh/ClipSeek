@@ -122,11 +122,22 @@ describe("mergeNearby", () => {
     ]);
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
-      start_s: 160, // the earliest moment: jump to the start of the scene
+      start_s: 160, // the best moment, which here is also the earliest
       end_s: 179,
       score: 0.033, // the best moment's score (max, not sum)
       matched_by: ["visual", "speech", "sound"], // union, in the fixed order
     });
+  });
+
+  test("a long run jumps to its best moment, not its earliest", () => {
+    // The real case: weak hits chained into a long run, with the match near its end.
+    const results = mergeNearby([
+      moment("a", 5, { score: 0.012 }),
+      moment("a", 6, { score: 0.013 }),
+      moment("a", 7, { score: 0.033 }),
+    ]);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ start_s: 70, end_s: 79 });
   });
 
   test("one empty bucket between still merges, two don't", () => {

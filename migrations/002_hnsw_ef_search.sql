@@ -1,0 +1,12 @@
+-- How many candidates an HNSW search keeps while it walks the index. pgvector's default is 40.
+--
+-- HNSW is built from how close stored vectors are to EACH OTHER. A CLIP text query lands far from
+-- every image vector, so with 40 candidates the walk can stop in the wrong part of the graph and
+-- miss the real matches. Measured on 1392 frames with the 41 eval queries, against an exact scan:
+--   ef_search  40: 84% of the true top 20 found on average, and 0% on the worst query
+--   ef_search 100: 100% on every query
+-- "white church with blue domes": the index's best frame scored 0.211, the true best 0.317.
+--
+-- ALTER ROLE stores it as a default for this database user, so every new connection gets it
+-- (API, workers, scripts) with no code. A connection already open keeps its old value.
+ALTER ROLE CURRENT_USER SET hnsw.ef_search = 100;
